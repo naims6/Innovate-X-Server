@@ -26,6 +26,8 @@ async function run() {
     // Database and Collection
     const naimsDb = client.db("innovatexDB");
     const usersCollection = naimsDb.collection("users");
+    const contestsCollection = naimsDb.collection("allContests");
+
     //User related API
     app.get("/users", async (req, res) => {
       const cursor = usersCollection.find();
@@ -47,6 +49,13 @@ async function run() {
       newUser.last_loggedIn = new Date().toISOString();
       newUser.role = "user";
       const result = await usersCollection.insertOne(newUser);
+      res.send(result);
+    });
+
+    // Contests related API
+    app.get("/contests", async (req, res) => {
+      const cursor = contestsCollection.find();
+      const result = await cursor.toArray();
       res.send(result);
     });
 
