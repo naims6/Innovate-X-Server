@@ -52,6 +52,21 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedUser = req.body;
+      console.log(updatedUser);
+      const filter = { _id: new ObjectId(id) };
+
+      const updateDoc = {
+        $set: {
+          ...updatedUser,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
     // Contests related API
     app.get("/contests", async (req, res) => {
       const cursor = contestsCollection.find();
