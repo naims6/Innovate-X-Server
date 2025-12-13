@@ -101,7 +101,6 @@ async function run() {
     // Payment related API
     app.post("/create-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
-      console.log(paymentInfo);
       const session = await stripe.checkout.sessions.create({
         line_items: [
           {
@@ -116,9 +115,17 @@ async function run() {
           },
         ],
         mode: "payment",
+
         success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.SITE_DOMAIN}/payment-cancel`,
       });
       res.send({ url: session.url });
+    });
+
+    app.patch("/payment-success", (req, res) => {
+      const sessionId = req.query.seasion_id;
+      console.log(sessionId);
+      res.send({ success: true });
     });
 
     // Send a ping to confirm a successful connection
