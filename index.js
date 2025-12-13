@@ -23,7 +23,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     // Database and Collection
     const naimsDb = client.db("innovatexDB");
     const usersCollection = naimsDb.collection("users");
@@ -77,7 +77,13 @@ async function run() {
 
     // Contests related API
     app.get("/contests", async (req, res) => {
-      const cursor = contestsCollection.find();
+      const search = req.query.search;
+      const query = {};
+      if (search) {
+        query.name = { $regex: search, $options: "i" };
+      }
+      console.log(search);
+      const cursor = contestsCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -132,10 +138,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
   }
 }
