@@ -122,9 +122,12 @@ async function run() {
       res.send({ url: session.url });
     });
 
-    app.patch("/payment-success", (req, res) => {
-      const sessionId = req.query.seasion_id;
-      console.log(sessionId);
+    app.patch("/payment-success", async (req, res) => {
+      const sessionId = req.query.session_id;
+      const session = await stripe.checkout.sessions.retrieve(
+        req.query.session_id
+      );
+      console.log(session);
       res.send({ success: true });
     });
 
