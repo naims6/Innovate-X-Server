@@ -29,6 +29,10 @@ async function run() {
     const usersCollection = naimsDb.collection("users");
     const contestsCollection = naimsDb.collection("allContests");
 
+    app.get("/", async (req, res) => {
+      res.send("hello world");
+    });
+
     //User related API
     app.get("/users", async (req, res) => {
       const cursor = usersCollection.find();
