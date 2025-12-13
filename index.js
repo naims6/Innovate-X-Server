@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const port = 3000;
 
 // middleware
@@ -32,6 +33,13 @@ async function run() {
     app.get("/users", async (req, res) => {
       const cursor = usersCollection.find();
       const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await usersCollection.findOne(query);
       res.send(result);
     });
 
@@ -88,6 +96,29 @@ async function run() {
         .limit(8);
       const result = await cursor.toArray();
       res.send(result);
+    });
+
+    // Payment related API
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      console.log(paymentInfo);
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "USD",
+              unit_amount: paymentInfo.prize,
+              product_data: {
+                name: `${paymentInfo.creator_name}`,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      });
+      res.send({ url: session.url });
     });
 
     // Send a ping to confirm a successful connection
