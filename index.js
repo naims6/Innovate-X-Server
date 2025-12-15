@@ -27,7 +27,7 @@ async function run() {
     // Database and Collection
     const naimsDb = client.db("innovatexDB");
     const usersCollection = naimsDb.collection("users");
-    const contestsCollection = naimsDb.collection("allContests");
+    const contestsCollection = naimsDb.collection("allContest");
     const contestsSubmission = naimsDb.collection("contestSubmission");
 
     app.get("/", async (req, res) => {
@@ -85,15 +85,26 @@ async function run() {
     });
 
     // Contests related API
-    app.get("/contests", async (req, res) => {
+    app.get("/contests/:status", async (req, res) => {
       const search = req.query.search;
+      const { status } = req.params;
+      console.log("status", status);
       const query = {};
       if (search) {
         query.category = { $regex: search, $options: "i" };
       }
-      console.log(search);
+      if (status) {
+        query.status = status;
+      }
+      console.log(query);
       const cursor = contestsCollection.find(query);
       const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.post("/contests", async (req, res) => {
+      const contestDetails = req.body;
+      const result = await contestsCollection.insertOne(contestDetails);
       res.send(result);
     });
 
