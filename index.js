@@ -41,6 +41,12 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/top-users", async (req, res) => {
+      const cursor = usersCollection.find().sort({ totalWon: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email };
@@ -74,7 +80,7 @@ async function run() {
       const id = req.params.id;
       const updatedUser = req.body;
       const filter = { _id: new ObjectId(id) };
-      console.log(updatedUser);
+
       const updateDoc = {
         $set: {
           ...updatedUser,
@@ -85,10 +91,20 @@ async function run() {
     });
 
     // Contests related API
+    app.get("/contests", async (req, res) => {
+      const search = req.query.search;
+      const query = {};
+      if (search) {
+        query.category = { $regex: search, $options: "i" };
+      }
+      const cursor = contestsCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.get("/contests/:status", async (req, res) => {
       const search = req.query.search;
       const { status } = req.params;
-      console.log("status", status);
       const query = {};
       if (search) {
         query.category = { $regex: search, $options: "i" };
@@ -121,6 +137,27 @@ async function run() {
         .sort({ participants: -1 })
         .limit(8);
       const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.patch("/contests/:id", async (req, res) => {
+      const id = req.params.id;
+      const status = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          ...status,
+        },
+      };
+      const result = await contestsCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    app.delete("/contests/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+
+      const result = await contestsCollection.deleteOne(filter);
       res.send(result);
     });
 
