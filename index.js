@@ -42,7 +42,7 @@ async function run() {
 
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
-      const query = { email: email };
+      const query = { email };
       const result = await usersCollection.findOne(query);
       res.send(result);
     });
@@ -127,21 +127,43 @@ async function run() {
             quantity: 1,
           },
         ],
+        metadata: {
+          contest_id: paymentInfo._id,
+        },
         mode: "payment",
 
         success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/payment-cancel`,
       });
+      // console.log(paymentInfo);
       res.send({ url: session.url });
     });
 
     app.patch("/payment-success", async (req, res) => {
-      const sessionId = req.query.session_id;
-      const session = await stripe.checkout.sessions.retrieve(
-        req.query.session_id
-      );
-      console.log(session);
-      res.send({ success: true });
+      try {
+        const sessionId = req.query.session_id;
+
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        if (session.payment_status === "paid") {
+          const query = {
+            _id: new ObjectId(session.metadata.contest_id),
+          };
+
+          const update = {
+            $inc: { participants: 1 },
+          };
+
+          const result = await contestsCollection.updateOne(query, update);
+
+          return res.send(result);
+        }
+
+        res.status(400).send({ message: "Payment not completed" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server error" });
+      }
     });
 
     // Send a ping to confirm a successful connection
