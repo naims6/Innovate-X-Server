@@ -23,7 +23,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // await client.connect();
+    await client.connect();
     // Database and Collection
     const naimsDb = client.db("innovatexDB");
     const usersCollection = naimsDb.collection("users");
@@ -49,6 +49,10 @@ async function run() {
 
     app.post("/users", async (req, res) => {
       const newUser = req.body;
+      newUser.bio = "--";
+      newUser.address = "--";
+      newUser.totalWon = 0;
+      newUser.totalParticipated = 0;
       // check is user already exists
       const existingUser = await usersCollection.findOne({
         email: newUser.email,
@@ -67,9 +71,8 @@ async function run() {
     app.patch("/users/:id", async (req, res) => {
       const id = req.params.id;
       const updatedUser = req.body;
-      console.log(updatedUser);
       const filter = { _id: new ObjectId(id) };
-
+      console.log(updatedUser);
       const updateDoc = {
         $set: {
           ...updatedUser,
@@ -84,7 +87,7 @@ async function run() {
       const search = req.query.search;
       const query = {};
       if (search) {
-        query.name = { $regex: search, $options: "i" };
+        query.category = { $regex: search, $options: "i" };
       }
       console.log(search);
       const cursor = contestsCollection.find(query);
@@ -142,10 +145,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    // await client.db("admin").command({ ping: 1 });
-    // console.log(
-    //   "Pinged your deployment. You successfully connected to MongoDB!"
-    // );
+    await client.db("admin").command({ ping: 1 });
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
   }
 }
