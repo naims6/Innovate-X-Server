@@ -28,6 +28,7 @@ async function run() {
     const naimsDb = client.db("innovatexDB");
     const usersCollection = naimsDb.collection("users");
     const contestsCollection = naimsDb.collection("allContests");
+    const contestsSubmission = naimsDb.collection("contestSubmission");
 
     app.get("/", async (req, res) => {
       res.send("hello world");
@@ -49,10 +50,6 @@ async function run() {
 
     app.post("/users", async (req, res) => {
       const newUser = req.body;
-      newUser.bio = "--";
-      newUser.address = "--";
-      newUser.totalWon = 0;
-      newUser.totalParticipated = 0;
       // check is user already exists
       const existingUser = await usersCollection.findOne({
         email: newUser.email,
@@ -64,6 +61,11 @@ async function run() {
       newUser.created_at = new Date().toISOString();
       newUser.last_loggedIn = new Date().toISOString();
       newUser.role = "user";
+      newUser.bio = "--";
+      newUser.address = "--";
+      newUser.totalWon = 0;
+      newUser.totalParticipated = 0;
+
       const result = await usersCollection.insertOne(newUser);
       res.send(result);
     });
@@ -108,6 +110,13 @@ async function run() {
         .sort({ participants: -1 })
         .limit(8);
       const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    // user task submitted api
+    app.post("/submissions", async (req, res) => {
+      const submission = req.body;
+      const result = await contestsSubmission.insertOne(submission);
       res.send(result);
     });
 
