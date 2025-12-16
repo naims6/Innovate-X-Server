@@ -4,10 +4,32 @@ const app = express();
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const port = 3000;
+const admin = require("firebase-admin");
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf-8"
+);
+const serviceAccount = JSON.parse(decoded);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 // middleware
 app.use(express.json());
 app.use(cors());
+
+// jwt middlewares
+const verifyJWT = async (req, res, next) => {
+  const token = req?.headers?.authorization?.split(" ")[1];
+  if (!token) return res.status(401).send({ message: "Unauthorized Access!" });
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.userEmail = decoded.email;
+    next();
+  } catch (err) {
+    console.log(err);
+    return res.status(401).send({ message: "Unauthorized Access!", err });
+  }
+};
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wsfcvqt.mongodb.net/?appName=Cluster0`;
@@ -29,6 +51,7 @@ async function run() {
     const usersCollection = naimsDb.collection("users");
     const contestsCollection = naimsDb.collection("allContest");
     const contestsSubmission = naimsDb.collection("contestSubmission");
+    const registrationsCollection = naimsDb.collection("contentRegistrations");
 
     app.get("/", async (req, res) => {
       res.send("hello world");
@@ -102,7 +125,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/contests/:status", async (req, res) => {
+    app.get("/contests/type/:status", async (req, res) => {
       const search = req.query.search;
       const { status } = req.params;
       const query = {};
@@ -112,7 +135,6 @@ async function run() {
       if (status) {
         query.status = status;
       }
-      console.log(query);
       const cursor = contestsCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
@@ -161,6 +183,37 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/registrations/check/:contestId", verifyJWT, async (req, res) => {
+      try {
+        const contestId = req.params.contestId;
+        const userEmail = req.userEmail;
+
+        // 1️⃣ Find user by email
+        const user = await usersCollection.findOne({ email: userEmail });
+        if (!user) {
+          return res.status(404).send({ registered: false });
+        }
+
+        // 2️⃣ Check registration
+        const registration = await registrationsCollection.findOne({
+          userEmail: userEmail,
+          contestId: contestId,
+          paymentStatus: "paid",
+        });
+        console.log("registration", registration);
+
+        // 3️⃣ Send result
+        if (registration) {
+          return res.send({ registered: true });
+        } else {
+          return res.send({ registered: false });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server error" });
+      }
+    });
+
     // user task submitted api
     app.post("/submissions", async (req, res) => {
       const submission = req.body;
@@ -176,7 +229,7 @@ async function run() {
           {
             price_data: {
               currency: "USD",
-              unit_amount: paymentInfo.prize,
+              unit_amount: paymentInfo.price,
               product_data: {
                 name: `${paymentInfo.creator_name}`,
               },
@@ -184,15 +237,18 @@ async function run() {
             quantity: 1,
           },
         ],
+        // customer_email: "naim@gmail.com",
         metadata: {
-          contest_id: paymentInfo._id,
+          contestId: paymentInfo.contestId,
+          userId: paymentInfo.userEmail,
         },
+        customer_email: paymentInfo.userEmail,
         mode: "payment",
 
         success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/payment-cancel`,
       });
-      // console.log(paymentInfo);
+      // console.log(session);
       res.send({ url: session.url });
     });
 
@@ -201,19 +257,39 @@ async function run() {
         const sessionId = req.query.session_id;
 
         const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const transactionId = session.payment_intent;
+
+        //  Prevent duplicate registration
+        const exists = await registrationsCollection.findOne({ transactionId });
+        if (exists) return res.send({ message: "Already processed" });
 
         if (session.payment_status === "paid") {
+          // 1️⃣ Save registration
+          await registrationsCollection.insertOne({
+            userEmail: session.customer_email,
+            contestId: session.metadata.contestId,
+            transactionId,
+            sessionId: session.id,
+            amount: session.amount_total,
+            paymentStatus: "paid",
+            createdAt: new Date(),
+          });
+
           const query = {
-            _id: new ObjectId(session.metadata.contest_id),
+            _id: new ObjectId(session.metadata.contestId),
           };
 
-          const update = {
-            $inc: { participants: 1 },
-          };
-
-          const result = await contestsCollection.updateOne(query, update);
-
-          return res.send(result);
+          // update user paricipated
+          const userPariticipatedUpdate = await usersCollection.updateOne(
+            { email: session.customer_email },
+            { $inc: { totalParticipated: 1 } }
+          );
+          // update contest collection
+          const contestUpdateresult = await contestsCollection.updateOne(
+            query,
+            { $inc: { participants: 1 } }
+          );
+          return res.send({ contestId: session.metadata.contestId });
         }
 
         res.status(400).send({ message: "Payment not completed" });
