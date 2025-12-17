@@ -263,7 +263,10 @@ async function run() {
       if (email) {
         query.userEmail = email;
       }
-      const result = await registrationsCollection.find(query).toArray();
+      const result = await registrationsCollection
+        .find(query)
+        .sort({ registeredAt: -1 })
+        .toArray();
       res.send(result);
     });
 
@@ -326,7 +329,7 @@ async function run() {
         //  Prevent duplicate registration
         const exists = await registrationsCollection.findOne({ transactionId });
         if (exists) return res.send({ message: "Already processed" });
-        console.log(session.metadata);
+
         if (session.payment_status === "paid") {
           // 1️⃣ Save registration
           await registrationsCollection.insertOne({
@@ -339,7 +342,7 @@ async function run() {
             sessionId: session.id,
             amount: session.amount_total,
             paymentStatus: "paid",
-            createdAt: new Date(),
+            registeredAt: new Date(),
           });
 
           const query = {
