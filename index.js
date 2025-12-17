@@ -148,18 +148,38 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/contest-categories", async (req, res) => {
+      const contests = await contestsCollection
+        .find({ status: "approved" }, { projection: { category: 1, _id: 0 } })
+        .toArray();
+
+      // Extract strings and remove duplicates
+      const uniqueCategories = [...new Set(contests.map((c) => c.category))];
+
+      res.send(uniqueCategories);
+    });
+
     app.get("/contests/type/:status", async (req, res) => {
-      const search = req.query.search;
-      const { status } = req.params;
-      const query = {};
+      const { search, category, sort } = req.query;
+
+      let query = { status: "approved" };
       if (search) {
-        query.category = { $regex: search, $options: "i" };
+        query.name = { $regex: search, $options: "i" };
       }
-      if (status) {
-        query.status = status;
+      if (category) {
+        query.category = category;
       }
-      const cursor = contestsCollection.find(query);
-      const result = await cursor.toArray();
+
+      let sortOptions = {};
+      if (sort === "newest") sortOptions = { createdAt: -1 };
+      if (sort === "participants") sortOptions = { participants: -1 };
+      if (sort === "prize") sortOptions = { prizeMoney: -1 };
+
+      const result = await contestsCollection
+        .find(query)
+        .sort(sortOptions)
+        .toArray();
+
       res.send(result);
     });
 
