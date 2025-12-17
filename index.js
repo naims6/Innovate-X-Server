@@ -236,6 +236,16 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/submissions/:email", async (req, res) => {
+      const { email } = req.params;
+      const query = {};
+      if (email) {
+        query.creatorEmail = email;
+      }
+      const result = await contestsSubmission.find(query).toArray();
+      res.send(result);
+    });
+
     app.post("/submissions", async (req, res) => {
       const submission = req.body;
       const result = await contestsSubmission.insertOne(submission);
