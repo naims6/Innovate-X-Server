@@ -53,13 +53,34 @@ async function run() {
     const contestsSubmission = naimsDb.collection("contestSubmission");
     const registrationsCollection = naimsDb.collection("contentRegistrations");
 
+    // role middlewares
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.userEmail;
+      const user = await usersCollection.findOne({ email });
+      if (user?.role !== "admin")
+        return res
+          .status(403)
+          .send({ message: "Admin only Actions!", role: user?.role });
+      next();
+    };
+
+    const verifyCreator = async (req, res, next) => {
+      const email = req.userEmail;
+      const user = await usersCollection.findOne({ email });
+      if (user?.role !== "creator")
+        return res
+          .status(403)
+          .send({ message: "Seller only Actions!", role: user?.role });
+      next();
+    };
+
     app.get("/", async (req, res) => {
       const docs = await contestsCollection.find({}).toArray();
       res.send(docs);
     });
 
     //User related API
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyJWT, async (req, res) => {
       const cursor = usersCollection.find();
       const result = await cursor.toArray();
       res.send(result);
@@ -71,7 +92,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/:email", async (req, res) => {
+    app.get("/users/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email };
       const result = await usersCollection.findOne(query);
@@ -100,7 +121,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/:id", async (req, res) => {
+    app.patch("/users/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const updatedUser = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -183,7 +204,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/contests", async (req, res) => {
+    app.post("/contests", verifyJWT, verifyCreator, async (req, res) => {
       const contestDetails = req.body;
       const result = await contestsCollection.insertOne(contestDetails);
       res.send(result);
@@ -257,7 +278,7 @@ async function run() {
     });
 
     // user task submitted api
-    app.get("/participate-contest/:email", async (req, res) => {
+    app.get("/participate-contest/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = {};
       if (email) {
@@ -270,7 +291,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/submissions/:email", async (req, res) => {
+    app.get("/submissions/:email", verifyJWT, async (req, res) => {
       const { email } = req.params;
       const query = {};
       if (email) {
@@ -280,7 +301,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/submissions", async (req, res) => {
+    app.post("/submissions", verifyJWT, async (req, res) => {
       const submission = req.body;
       const result = await contestsSubmission.insertOne(submission);
       res.send(result);
