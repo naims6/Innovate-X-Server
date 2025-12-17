@@ -137,6 +137,17 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/contests/winner/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = {};
+      if (email) {
+        query.winnerEmail = email;
+      }
+      const cursor = contestsCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.get("/contests/type/:status", async (req, res) => {
       const search = req.query.search;
       const { status } = req.params;
