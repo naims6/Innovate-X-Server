@@ -49,12 +49,13 @@ async function run() {
     // Database and Collection
     const naimsDb = client.db("innovatexDB");
     const usersCollection = naimsDb.collection("users");
-    const contestsCollection = naimsDb.collection("allContest");
+    const contestsCollection = naimsDb.collection("allContests");
     const contestsSubmission = naimsDb.collection("contestSubmission");
     const registrationsCollection = naimsDb.collection("contentRegistrations");
 
     app.get("/", async (req, res) => {
-      res.send("hello world");
+      const docs = await contestsCollection.find({}).toArray();
+      res.send(docs);
     });
 
     //User related API
@@ -119,6 +120,17 @@ async function run() {
       const query = {};
       if (search) {
         query.category = { $regex: search, $options: "i" };
+      }
+      const cursor = contestsCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.get("/contests/email/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = {};
+      if (email) {
+        query.creatorEmail = email;
       }
       const cursor = contestsCollection.find(query);
       const result = await cursor.toArray();
@@ -201,7 +213,6 @@ async function run() {
           paymentStatus: "paid",
         });
         console.log("registration", registration);
-
         // 3️⃣ Send result
         if (registration) {
           return res.send({ registered: true });
@@ -215,6 +226,16 @@ async function run() {
     });
 
     // user task submitted api
+    app.get("/participate-contest/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = {};
+      if (email) {
+        query.userEmail = email;
+      }
+      const result = await registrationsCollection.find(query).toArray();
+      res.send(result);
+    });
+
     app.post("/submissions", async (req, res) => {
       const submission = req.body;
       const result = await contestsSubmission.insertOne(submission);
@@ -237,10 +258,12 @@ async function run() {
             quantity: 1,
           },
         ],
-        // customer_email: "naim@gmail.com",
         metadata: {
           contestId: paymentInfo.contestId,
-          userId: paymentInfo.userEmail,
+          userEmail: paymentInfo.userEmail,
+          deadline: paymentInfo.deadline,
+          title: paymentInfo.title,
+          name: paymentInfo.name,
         },
         customer_email: paymentInfo.userEmail,
         mode: "payment",
@@ -248,7 +271,7 @@ async function run() {
         success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/payment-cancel`,
       });
-      // console.log(session);
+
       res.send({ url: session.url });
     });
 
@@ -262,12 +285,15 @@ async function run() {
         //  Prevent duplicate registration
         const exists = await registrationsCollection.findOne({ transactionId });
         if (exists) return res.send({ message: "Already processed" });
-
+        console.log(session.metadata);
         if (session.payment_status === "paid") {
           // 1️⃣ Save registration
           await registrationsCollection.insertOne({
             userEmail: session.customer_email,
             contestId: session.metadata.contestId,
+            name: session.metadata.name,
+            title: session.metadata.title,
+            deadline: session.metadata.deadline,
             transactionId,
             sessionId: session.id,
             amount: session.amount_total,
