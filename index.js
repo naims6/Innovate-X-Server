@@ -26,7 +26,6 @@ const verifyJWT = async (req, res, next) => {
     req.userEmail = decoded.email;
     next();
   } catch (err) {
-    console.log(err);
     return res.status(401).send({ message: "Unauthorized Access!", err });
   }
 };
@@ -43,9 +42,13 @@ const client = new MongoClient(uri, {
   },
 });
 
+app.get("/", async (req, res) => {
+  res.send("Hello World!");
+});
+
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     // Database and Collection
     const naimsDb = client.db("innovatexDB");
     const usersCollection = naimsDb.collection("users");
@@ -74,11 +77,6 @@ async function run() {
           .send({ message: "Seller only Actions!", role: user?.role });
       next();
     };
-
-    app.get("/", async (req, res) => {
-      const docs = await contestsCollection.find({}).toArray();
-      res.send(docs);
-    });
 
     //User related API
     app.get("/users", verifyJWT, async (req, res) => {
@@ -139,7 +137,6 @@ async function run() {
     app.patch("/users/email/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const filter = { email };
-      console.log(email);
       const updateDoc = {
         $inc: {
           totalWon: 1,
@@ -293,7 +290,6 @@ async function run() {
           contestId: contestId,
           paymentStatus: "paid",
         });
-        console.log("registration", registration);
         // 3️⃣ Send result
         if (registration) {
           return res.send({ registered: true });
@@ -333,7 +329,6 @@ async function run() {
     app.post("/submissions", verifyJWT, async (req, res) => {
       const submission = req.body;
       const contestId = submission.contestId;
-      console.log("contest id", contestId);
       const contestQuery = {
         _id: new ObjectId(contestId),
       };
@@ -449,15 +444,13 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
   }
 }
 run().catch(console.dir);
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
-});
+app.listen(port);
