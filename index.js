@@ -181,12 +181,18 @@ async function run() {
     });
 
     app.get("/contests/type/:status", async (req, res) => {
-      const { search, category, sort } = req.query;
+      const { search, category, sort, page = 1, limit = 10 } = req.query;
+
+      const pageNumber = parseInt(page);
+      const limitNumber = parseInt(limit);
+      const skip = (pageNumber - 1) * limitNumber;
 
       let query = { status: "approved" };
+
       if (search) {
         query.name = { $regex: search, $options: "i" };
       }
+
       if (category) {
         query.category = category;
       }
@@ -196,12 +202,21 @@ async function run() {
       if (sort === "participants") sortOptions = { participants: -1 };
       if (sort === "prize") sortOptions = { prizeMoney: -1 };
 
-      const result = await contestsCollection
+      const total = await contestsCollection.countDocuments(query);
+
+      const contests = await contestsCollection
         .find(query)
         .sort(sortOptions)
+        .skip(skip)
+        .limit(limitNumber)
         .toArray();
 
-      res.send(result);
+      res.send({
+        contests,
+        total,
+        page: pageNumber,
+        totalPages: Math.ceil(total / limitNumber),
+      });
     });
 
     app.post("/contests", verifyJWT, verifyCreator, async (req, res) => {
@@ -239,7 +254,7 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/contests/:id", async (req, res) => {
+    app.delete("/contests/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
 
@@ -303,6 +318,19 @@ async function run() {
 
     app.post("/submissions", verifyJWT, async (req, res) => {
       const submission = req.body;
+      const contestId = submission.contestId;
+      console.log("contest id", contestId);
+      const contestQuery = {
+        _id: new ObjectId(contestId),
+      };
+      const updateContest = {
+        $inc: { submissions: 1 },
+      };
+
+      const contest = await contestsCollection.updateOne(
+        contestQuery,
+        updateContest
+      );
       const result = await contestsSubmission.insertOne(submission);
       res.send(result);
     });
