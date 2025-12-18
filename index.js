@@ -52,6 +52,7 @@ async function run() {
     const contestsCollection = naimsDb.collection("allContests");
     const contestsSubmission = naimsDb.collection("contestSubmission");
     const registrationsCollection = naimsDb.collection("contentRegistrations");
+    const winnersCollection = naimsDb.collection("winnersCollection");
 
     // role middlewares
     const verifyAdmin = async (req, res, next) => {
@@ -129,6 +130,19 @@ async function run() {
       const updateDoc = {
         $set: {
           ...updatedUser,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    app.patch("/users/email/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const filter = { email };
+      console.log(email);
+      const updateDoc = {
+        $inc: {
+          totalWon: 1,
         },
       };
       const result = await usersCollection.updateOne(filter, updateDoc);
@@ -332,6 +346,22 @@ async function run() {
         updateContest
       );
       const result = await contestsSubmission.insertOne(submission);
+      res.send(result);
+    });
+
+    // winner related api
+    app.get("/winners", async (req, res) => {
+      const winners = await winnersCollection
+        .find({})
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.send(winners);
+    });
+
+    app.post("/winners", async (req, res) => {
+      const winnerData = req.body;
+      winnerData.createdAt = new Date();
+      const result = await winnersCollection.insertOne(winnerData);
       res.send(result);
     });
 
